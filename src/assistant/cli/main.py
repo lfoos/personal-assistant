@@ -229,19 +229,14 @@ def main() -> None:
                 _send_sms(f"Daily briefing for {date_str} is ready: {doc_url}", claude_client)
 
         elif args.command == "sms":
-            phone = os.getenv("RECIPIENT_PHONE_NUMBER")
-            if not phone:
-                raise ConfigurationError(
-                    "RECIPIENT_PHONE_NUMBER is not set. Add it to your .env file."
-                )
-
             if args.sms_command == "email":
                 feature = EmailActionItemsFeature(gmail_client, claude_client)
                 content = "".join(feature.run(max_emails=args.max_emails))
 
             elif args.sms_command == "calendar":
-                feature = CalendarPrepFeature(calendar_client, claude_client)
-                content = "".join(feature.run(args.event_id))
+                if args.sms_cal_command == "prep":
+                    feature = CalendarPrepFeature(calendar_client, claude_client)
+                    content = "".join(feature.run(args.event_id))
 
             elif args.sms_command == "linkedin":
                 linkedin_client = LinkedInDigestClient(gmail_client)
@@ -261,9 +256,10 @@ def main() -> None:
                         f.write(f"DAILY_BRIEFING_DOC_ID={returned_doc_id}\n")
                 content = f"Daily briefing for {date_str} is ready: {doc_url}"
 
-            sms_feature = SmsSendFeature(claude_client, SmsClient())
-            list(sms_feature.run(content, phone))
-            print("✅ SMS sent.")
+            else:
+                raise AssistantError(f"Unknown sms subcommand: {args.sms_command}")
+
+            _send_sms(content, claude_client)
 
     except AssistantError as e:
         print(f"\nError: {e}", file=sys.stderr)
