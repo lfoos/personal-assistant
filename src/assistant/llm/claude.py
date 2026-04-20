@@ -12,7 +12,7 @@ class ClaudeClient:
     """Wraps the Anthropic SDK so no other layer imports anthropic directly."""
 
     DEFAULT_MODEL: ClassVar[str] = "claude-opus-4-6"
-    DEFAULT_MAX_TOKENS: ClassVar[int] = 1024
+    DEFAULT_MAX_TOKENS: ClassVar[int] = 4096
 
     def __init__(
         self,
