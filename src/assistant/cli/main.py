@@ -237,6 +237,8 @@ def main() -> None:
                 if args.sms_cal_command == "prep":
                     feature = CalendarPrepFeature(calendar_client, claude_client)
                     content = "".join(feature.run(args.event_id))
+                else:
+                    raise AssistantError(f"Unknown sms calendar subcommand: {args.sms_cal_command}")
 
             elif args.sms_command == "linkedin":
                 linkedin_client = LinkedInDigestClient(gmail_client)

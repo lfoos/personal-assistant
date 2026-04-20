@@ -12,7 +12,7 @@ class SmsClient:
     def __init__(self) -> None:
         try:
             self._sns = boto3.client("sns")
-        except (ClientError, BotoCoreError) as e:
+        except BotoCoreError as e:
             raise IntegrationError(f"Failed to initialize SNS client: {e}") from e
 
     def send(self, to: str, body: str) -> None:
