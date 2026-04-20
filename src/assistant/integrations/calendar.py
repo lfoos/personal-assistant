@@ -1,7 +1,7 @@
 """Google Calendar API integration."""
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -79,6 +79,39 @@ class CalendarClient:
         except HttpError as e:
             if e.resp.status == 404:
                 raise EventNotFoundError(f"Event '{event_id}' not found.") from e
+            raise IntegrationError(f"Calendar API error: {e}") from e
+
+    def get_events_for_date(self, target_date: date) -> list[CalendarEvent]:
+        """Return all events on the given date, ordered by start time.
+
+        Uses midnight UTC as the start boundary and next-day midnight as the exclusive end boundary.
+
+        Raises:
+            IntegrationError: On Calendar API failure.
+        """
+        time_min = datetime(
+            target_date.year, target_date.month, target_date.day, 0, 0, 0,
+            tzinfo=timezone.utc,
+        )
+        time_max = datetime(
+            target_date.year, target_date.month, target_date.day, 0, 0, 0,
+            tzinfo=timezone.utc,
+        ) + timedelta(days=1)
+        try:
+            results = (
+                self._service.events()
+                .list(
+                    calendarId="primary",
+                    timeMin=time_min.isoformat(),
+                    timeMax=time_max.isoformat(),
+                    maxResults=50,  # sufficient for a personal calendar; no pagination needed
+                    singleEvents=True,
+                    orderBy="startTime",
+                )
+                .execute()
+            )
+            return [self._parse_event(e) for e in results.get("items", [])]
+        except HttpError as e:
             raise IntegrationError(f"Calendar API error: {e}") from e
 
     def _parse_event(self, raw: dict) -> CalendarEvent:

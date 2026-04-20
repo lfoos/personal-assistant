@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+from datetime import date as Date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,12 +11,14 @@ from dotenv import load_dotenv
 from assistant.cli.formatters import format_event_detail, format_event_list
 from assistant.exceptions import AssistantError
 from assistant.features.calendar_prep import CalendarPrepFeature
+from assistant.features.daily_briefing import DailyBriefingFeature
 from assistant.features.email_actions import EmailActionItemsFeature
 from assistant.features.linkedin_feed import LinkedInFeedFeature
-from assistant.integrations.linkedin import LinkedInDigestClient
 from assistant.integrations.base import GoogleAuthManager
 from assistant.integrations.calendar import CalendarClient
+from assistant.integrations.docs import DocsClient
 from assistant.integrations.gmail import GmailClient
+from assistant.integrations.linkedin import LinkedInDigestClient
 from assistant.llm.claude import ClaudeClient
 
 _PROJECT_ROOT = Path(__file__).parents[3]
@@ -61,6 +64,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of days of digest emails to look back (default: 14)",
     )
 
+    # -- daily subcommand --
+    daily_parser = subparsers.add_parser(
+        "daily", help="Generate a daily briefing and save it to Google Docs."
+    )
+    daily_parser.add_argument(
+        "--date",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Date to generate briefing for (default: today)",
+    )
+
     return parser
 
 
@@ -89,7 +103,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        _, gmail_client, calendar_client, claude_client = _build_clients(api_key, args.model)
+        auth_manager, gmail_client, calendar_client, claude_client = _build_clients(api_key, args.model)
 
         if args.command == "email":
             feature = EmailActionItemsFeature(gmail_client, claude_client)
@@ -126,6 +140,28 @@ def main() -> None:
             for chunk in feature.run(days=args.days):
                 print(chunk, end="", flush=True)
             print("\n" + "=" * 60)
+
+        elif args.command == "daily":
+            target_date = Date.fromisoformat(args.date) if args.date else Date.today()
+            doc_id = os.getenv("DAILY_BRIEFING_DOC_ID") or None
+            date_str = target_date.strftime("%A, %B %-d, %Y")
+
+            docs_client = DocsClient(auth_manager)
+            feature = DailyBriefingFeature(gmail_client, calendar_client, claude_client, docs_client)
+
+            print(f"\n📋 Generating daily briefing for {date_str}...")
+            print("=" * 60)
+
+            returned_doc_id, doc_url = feature.run(target_date, doc_id)
+
+            if doc_id is None:
+                env_path = _PROJECT_ROOT / ".env"
+                with open(env_path, "a") as f:
+                    f.write(f"DAILY_BRIEFING_DOC_ID={returned_doc_id}\n")
+                print("\n✅ Created new Google Doc and saved ID to .env")
+
+            print(f"\n✅ Briefing written to: {doc_url}")
+            print("=" * 60)
 
     except AssistantError as e:
         print(f"\nError: {e}", file=sys.stderr)
