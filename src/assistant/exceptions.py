@@ -10,7 +10,7 @@ class AuthenticationError(AssistantError):
 
 
 class IntegrationError(AssistantError):
-    """A Google API call returned an unexpected error."""
+    """An external API call returned an unexpected error."""
 
 
 class LLMError(AssistantError):
