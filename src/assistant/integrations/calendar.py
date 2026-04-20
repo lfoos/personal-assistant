@@ -1,7 +1,7 @@
 """Google Calendar API integration."""
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -84,7 +84,7 @@ class CalendarClient:
     def get_events_for_date(self, target_date: date) -> list[CalendarEvent]:
         """Return all events on the given date, ordered by start time.
 
-        Uses midnight–23:59:59 UTC as the day boundary.
+        Uses midnight UTC as the start boundary and next-day midnight as the exclusive end boundary.
 
         Raises:
             IntegrationError: On Calendar API failure.
@@ -94,9 +94,9 @@ class CalendarClient:
             tzinfo=timezone.utc,
         )
         time_max = datetime(
-            target_date.year, target_date.month, target_date.day, 23, 59, 59,
+            target_date.year, target_date.month, target_date.day, 0, 0, 0,
             tzinfo=timezone.utc,
-        )
+        ) + timedelta(days=1)
         try:
             results = (
                 self._service.events()
@@ -104,7 +104,7 @@ class CalendarClient:
                     calendarId="primary",
                     timeMin=time_min.isoformat(),
                     timeMax=time_max.isoformat(),
-                    maxResults=50,
+                    maxResults=50,  # sufficient for a personal calendar; no pagination needed
                     singleEvents=True,
                     orderBy="startTime",
                 )

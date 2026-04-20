@@ -31,7 +31,7 @@ def _raw_event(event_id="evt1", summary="Standup"):
 
 
 def test_get_events_for_date_queries_correct_time_range(calendar_client):
-    """get_events_for_date() calls the API with timeMin at midnight and timeMax at 23:59:59."""
+    """get_events_for_date() calls the API with timeMin at midnight and timeMax at next-day midnight."""
     calendar_client._service.events().list().execute.return_value = {"items": []}
 
     calendar_client.get_events_for_date(date(2026, 4, 21))
@@ -39,7 +39,7 @@ def test_get_events_for_date_queries_correct_time_range(calendar_client):
     list_call = calendar_client._service.events.return_value.list
     kwargs = list_call.call_args.kwargs
     assert kwargs["timeMin"] == "2026-04-21T00:00:00+00:00"
-    assert kwargs["timeMax"] == "2026-04-21T23:59:59+00:00"
+    assert kwargs["timeMax"] == "2026-04-22T00:00:00+00:00"
 
 
 def test_get_events_for_date_returns_calendar_events(calendar_client):
