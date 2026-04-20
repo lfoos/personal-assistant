@@ -8,7 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from assistant.cli.formatters import format_event_detail, format_event_list
-from assistant.exceptions import AssistantError, ConfigurationError
+from assistant.exceptions import AssistantError
 from assistant.features.calendar_prep import CalendarPrepFeature
 from assistant.features.email_actions import EmailActionItemsFeature
 from assistant.features.linkedin_feed import LinkedInFeedFeature
