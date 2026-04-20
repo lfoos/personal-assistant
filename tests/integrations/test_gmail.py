@@ -52,3 +52,19 @@ def test_search_messages_returns_empty_list_when_no_results(gmail_client):
     results = gmail_client.search_messages(query="from:nobody.example.com", max_results=5)
 
     assert results == []
+
+
+def test_search_messages_raises_integration_error_on_api_failure(gmail_client):
+    """search_messages() raises IntegrationError when the Gmail API fails."""
+    from googleapiclient.errors import HttpError
+    from unittest.mock import MagicMock
+    from assistant.exceptions import IntegrationError
+
+    resp = MagicMock()
+    resp.status = 500
+    gmail_client._service.users().messages().list().execute.side_effect = HttpError(
+        resp=resp, content=b"Server error"
+    )
+
+    with pytest.raises(IntegrationError):
+        gmail_client.search_messages(query="from:linkedin.com", max_results=5)
