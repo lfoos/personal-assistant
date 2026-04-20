@@ -43,6 +43,8 @@ class DailyBriefingFeature:
         Raises:
             IntegrationError: If email fetching or doc operations fail.
         """
+        # Email errors propagate intentionally — if we can't get emails, abort
+        # before writing an incomplete briefing to the doc.
         email_output = "".join(
             EmailActionItemsFeature(self._gmail, self._claude).run()
         )
