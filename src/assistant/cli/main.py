@@ -11,6 +11,8 @@ from assistant.cli.formatters import format_event_detail, format_event_list
 from assistant.exceptions import AssistantError, ConfigurationError
 from assistant.features.calendar_prep import CalendarPrepFeature
 from assistant.features.email_actions import EmailActionItemsFeature
+from assistant.features.linkedin_feed import LinkedInFeedFeature
+from assistant.integrations.linkedin import LinkedInDigestClient
 from assistant.integrations.base import GoogleAuthManager
 from assistant.integrations.calendar import CalendarClient
 from assistant.integrations.gmail import GmailClient
@@ -51,6 +53,13 @@ def _build_parser() -> argparse.ArgumentParser:
 
     prep_parser = cal_sub.add_parser("prep", help="Generate preparation notes for an event.")
     prep_parser.add_argument("event_id", help="Google Calendar event ID (from `assistant calendar list`)")
+
+    # -- linkedin subcommand --
+    linkedin_parser = subparsers.add_parser("linkedin", help="Summarize LinkedIn network activity from digest emails.")
+    linkedin_parser.add_argument(
+        "--days", type=int, default=14, metavar="N",
+        help="Number of days of digest emails to look back (default: 14)",
+    )
 
     return parser
 
@@ -108,6 +117,15 @@ def main() -> None:
                 for chunk in feature.run(args.event_id):
                     print(chunk, end="", flush=True)
                 print("\n" + "=" * 60)
+
+        elif args.command == "linkedin":
+            linkedin_client = LinkedInDigestClient(gmail_client)
+            feature = LinkedInFeedFeature(linkedin_client, claude_client)
+            print(f"\n💼 LinkedIn network activity (last {args.days} days)...\n")
+            print("=" * 60)
+            for chunk in feature.run(days=args.days):
+                print(chunk, end="", flush=True)
+            print("\n" + "=" * 60)
 
     except AssistantError as e:
         print(f"\nError: {e}", file=sys.stderr)
