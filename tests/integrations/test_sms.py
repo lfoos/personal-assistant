@@ -37,3 +37,12 @@ def test_send_raises_integration_error_on_client_error(sms_client_and_mock):
     with pytest.raises(IntegrationError) as exc_info:
         client.send("+15551234567", "Hello world")
     assert isinstance(exc_info.value.__cause__, ClientError)
+
+
+def test_init_raises_integration_error_when_boto3_fails():
+    """SmsClient() raises IntegrationError if boto3 client creation fails."""
+    from botocore.exceptions import NoCredentialsError
+    with patch("assistant.integrations.sms.boto3") as mock_boto:
+        mock_boto.client.side_effect = NoCredentialsError()
+        with pytest.raises(IntegrationError):
+            SmsClient()

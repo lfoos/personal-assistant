@@ -10,7 +10,10 @@ class SmsClient:
     """Sends SMS messages via AWS SNS direct publish."""
 
     def __init__(self) -> None:
-        self._sns = boto3.client("sns")
+        try:
+            self._sns = boto3.client("sns")
+        except (ClientError, BotoCoreError) as e:
+            raise IntegrationError(f"Failed to initialize SNS client: {e}") from e
 
     def send(self, to: str, body: str) -> None:
         """Send an SMS to the given E.164 phone number.

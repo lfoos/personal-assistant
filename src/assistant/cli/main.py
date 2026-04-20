@@ -113,8 +113,8 @@ def _send_sms(content: str, claude_client: ClaudeClient) -> None:
             "RECIPIENT_PHONE_NUMBER is not set. Add it to your .env file."
         )
     sms_feature = SmsSendFeature(claude_client, SmsClient())
-    for chunk in sms_feature.run(content, phone):
-        print(chunk)
+    list(sms_feature.run(content, phone))
+    print("✅ SMS sent.")
 
 
 def main() -> None:
