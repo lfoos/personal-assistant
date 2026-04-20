@@ -50,3 +50,19 @@ def test_integration_error_from_sms_propagates(feature, mock_claude, mock_sms):
     mock_sms.send.side_effect = IntegrationError("SNS quota exceeded")
     with pytest.raises(IntegrationError):
         list(feature.run("content", "+15551234567"))
+
+
+def test_llm_error_from_claude_propagates(feature, mock_claude):
+    """run() lets LLMError from claude.stream_response propagate."""
+    from assistant.exceptions import LLMError
+    mock_claude.stream_response.side_effect = LLMError("API failure")
+    with pytest.raises(LLMError):
+        list(feature.run("content", "+15551234567"))
+
+
+def test_empty_claude_summary_raises_llm_error(feature, mock_claude):
+    """run() raises LLMError if Claude returns an empty or whitespace-only summary."""
+    from assistant.exceptions import LLMError
+    mock_claude.stream_response.return_value = iter(["   "])
+    with pytest.raises(LLMError):
+        list(feature.run("content", "+15551234567"))

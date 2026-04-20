@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 
+from assistant.exceptions import LLMError
 from assistant.integrations.sms import SmsClient
 from assistant.llm.claude import ClaudeClient
 
@@ -11,6 +12,8 @@ _SYSTEM_PROMPT = (
     "Write in plain text only — no markdown, no bullet symbols, no headers. "
     "Keep the total response under 1200 characters. Be direct and specific."
 )
+
+_MAX_SMS_CHARS = 1200
 
 
 class SmsSendFeature:
@@ -31,9 +34,11 @@ class SmsSendFeature:
             A single confirmation string after the SMS is sent.
 
         Raises:
-            LLMError: If the Claude summarization call fails.
+            LLMError: If the Claude summarization call fails or returns empty output.
             IntegrationError: If the SNS send fails.
         """
         summary = "".join(self._claude.stream_response(_SYSTEM_PROMPT, content))
-        self._sms.send(to, summary)
+        if not summary.strip():
+            raise LLMError("Claude returned an empty summary")
+        self._sms.send(to, summary[:_MAX_SMS_CHARS])
         yield f"✅ SMS sent to {to}"
