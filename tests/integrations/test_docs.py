@@ -48,8 +48,8 @@ def test_create_doc_raises_integration_error_on_failure(docs_client):
         docs_client.create_doc("My Doc")
 
 
-def test_append_section_calls_batch_update(docs_client):
-    """append_section() fetches document end index and calls batchUpdate."""
+def test_append_section_inserts_at_correct_end_index(docs_client):
+    """append_section() inserts text at endIndex - 1 of the last content element."""
     docs_client._docs.documents().get().execute.return_value = {
         "body": {"content": [{"endIndex": 1}, {"endIndex": 100}]}
     }
@@ -57,7 +57,11 @@ def test_append_section_calls_batch_update(docs_client):
 
     docs_client.append_section("doc123", "Hello world\n")
 
-    docs_client._docs.documents.return_value.batchUpdate.assert_called()
+    batchUpdate_call = docs_client._docs.documents.return_value.batchUpdate
+    call_body = batchUpdate_call.call_args.kwargs.get("body") or batchUpdate_call.call_args.args[1]
+    request = call_body["requests"][0]
+    assert request["insertText"]["location"]["index"] == 99
+    assert request["insertText"]["text"] == "Hello world\n"
 
 
 def test_append_section_raises_integration_error_on_404(docs_client):

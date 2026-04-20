@@ -48,7 +48,11 @@ class DocsClient:
         """
         try:
             doc = self._docs.documents().get(documentId=doc_id).execute()
-            end_index = doc["body"]["content"][-1]["endIndex"] - 1
+            content_elements = doc["body"]["content"]
+            end_index = next(
+                (el["endIndex"] for el in reversed(content_elements) if "endIndex" in el),
+                1,
+            ) - 1
             self._docs.documents().batchUpdate(
                 documentId=doc_id,
                 body={
