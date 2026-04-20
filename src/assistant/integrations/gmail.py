@@ -46,6 +46,28 @@ class GmailClient:
         except HttpError as e:
             raise IntegrationError(f"Gmail API error: {e}") from e
 
+    def search_messages(self, query: str, max_results: int = 20) -> list[EmailMessage]:
+        """Search messages using a Gmail query string.
+
+        Args:
+            query: Gmail search query (e.g. 'from:linkedin.com subject:digest')
+            max_results: Maximum number of messages to return.
+
+        Raises:
+            IntegrationError: On Gmail API failure.
+        """
+        try:
+            results = (
+                self._service.users()
+                .messages()
+                .list(userId="me", q=query, maxResults=max_results)
+                .execute()
+            )
+            messages = results.get("messages", [])
+            return [self._fetch_message(m["id"]) for m in messages]
+        except HttpError as e:
+            raise IntegrationError(f"Gmail API error: {e}") from e
+
     def _fetch_message(self, message_id: str) -> EmailMessage:
         msg = (
             self._service.users()
