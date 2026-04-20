@@ -9,7 +9,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from assistant.cli.formatters import format_event_detail, format_event_list
-from assistant.exceptions import AssistantError
+from assistant.exceptions import AssistantError, ConfigurationError
+from assistant.features.sms_send import SmsSendFeature
+from assistant.integrations.sms import SmsClient
 from assistant.features.calendar_prep import CalendarPrepFeature
 from assistant.features.daily_briefing import DailyBriefingFeature
 from assistant.features.email_actions import EmailActionItemsFeature
@@ -43,6 +45,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--max-emails", type=int, default=20, metavar="N",
         help="Number of recent emails to analyze (default: 20)",
     )
+    email_parser.add_argument(
+        "--sms", action="store_true", help="Send output summary via SMS after printing."
+    )
 
     # -- calendar subcommand --
     cal_parser = subparsers.add_parser("calendar", help="Calendar event preparation.")
@@ -56,12 +61,18 @@ def _build_parser() -> argparse.ArgumentParser:
 
     prep_parser = cal_sub.add_parser("prep", help="Generate preparation notes for an event.")
     prep_parser.add_argument("event_id", help="Google Calendar event ID (from `assistant calendar list`)")
+    prep_parser.add_argument(
+        "--sms", action="store_true", help="Send output summary via SMS after printing."
+    )
 
     # -- linkedin subcommand --
     linkedin_parser = subparsers.add_parser("linkedin", help="Summarize LinkedIn network activity from digest emails.")
     linkedin_parser.add_argument(
         "--days", type=int, default=14, metavar="N",
         help="Number of days of digest emails to look back (default: 14)",
+    )
+    linkedin_parser.add_argument(
+        "--sms", action="store_true", help="Send output summary via SMS after printing."
     )
 
     # -- daily subcommand --
@@ -73,6 +84,9 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="YYYY-MM-DD",
         help="Date to generate briefing for (default: today)",
+    )
+    daily_parser.add_argument(
+        "--sms", action="store_true", help="Send output summary via SMS after printing."
     )
 
     return parser
@@ -89,6 +103,18 @@ def _build_clients(api_key: str, model: str) -> tuple[GoogleAuthManager, GmailCl
         CalendarClient(auth_manager),
         ClaudeClient(api_key=api_key, model=model),
     )
+
+
+def _send_sms(content: str, claude_client: ClaudeClient) -> None:
+    """Summarize content with Claude and send to RECIPIENT_PHONE_NUMBER via SMS."""
+    phone = os.getenv("RECIPIENT_PHONE_NUMBER")
+    if not phone:
+        raise ConfigurationError(
+            "RECIPIENT_PHONE_NUMBER is not set. Add it to your .env file."
+        )
+    sms_feature = SmsSendFeature(claude_client, SmsClient())
+    for chunk in sms_feature.run(content, phone):
+        print(chunk)
 
 
 def main() -> None:
@@ -109,9 +135,12 @@ def main() -> None:
             feature = EmailActionItemsFeature(gmail_client, claude_client)
             print(f"\n📬 Analyzing your {args.max_emails} most recent emails...\n")
             print("=" * 60)
-            for chunk in feature.run(max_emails=args.max_emails):
+            chunks = list(feature.run(max_emails=args.max_emails))
+            for chunk in chunks:
                 print(chunk, end="", flush=True)
             print("\n" + "=" * 60)
+            if args.sms:
+                _send_sms("".join(chunks), claude_client)
 
         elif args.command == "calendar":
             if args.cal_command == "list":
@@ -123,23 +152,28 @@ def main() -> None:
 
             elif args.cal_command == "prep":
                 feature = CalendarPrepFeature(calendar_client, claude_client)
-                # Fetch event details for the header before streaming
                 event = calendar_client.get_event_by_id(args.event_id)
                 print(f"\n📅 Preparing for:\n")
                 print(format_event_detail(event))
                 print("\n" + "=" * 60)
-                for chunk in feature.run(args.event_id):
+                chunks = list(feature.run(args.event_id))
+                for chunk in chunks:
                     print(chunk, end="", flush=True)
                 print("\n" + "=" * 60)
+                if args.sms:
+                    _send_sms("".join(chunks), claude_client)
 
         elif args.command == "linkedin":
             linkedin_client = LinkedInDigestClient(gmail_client)
             feature = LinkedInFeedFeature(linkedin_client, claude_client)
             print(f"\n💼 LinkedIn network activity (last {args.days} days)...\n")
             print("=" * 60)
-            for chunk in feature.run(days=args.days):
+            chunks = list(feature.run(days=args.days))
+            for chunk in chunks:
                 print(chunk, end="", flush=True)
             print("\n" + "=" * 60)
+            if args.sms:
+                _send_sms("".join(chunks), claude_client)
 
         elif args.command == "daily":
             target_date = Date.fromisoformat(args.date) if args.date else Date.today()
@@ -162,6 +196,8 @@ def main() -> None:
 
             print(f"\n✅ Briefing written to: {doc_url}")
             print("=" * 60)
+            if args.sms:
+                _send_sms(f"Daily briefing for {date_str} is ready: {doc_url}", claude_client)
 
     except AssistantError as e:
         print(f"\nError: {e}", file=sys.stderr)
