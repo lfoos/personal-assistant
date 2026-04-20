@@ -1,7 +1,7 @@
 """AWS SNS SMS integration."""
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 
 from assistant.exceptions import IntegrationError
 
@@ -24,5 +24,5 @@ class SmsClient:
         """
         try:
             self._sns.publish(PhoneNumber=to, Message=body)
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             raise IntegrationError(f"SMS send failed: {e}") from e

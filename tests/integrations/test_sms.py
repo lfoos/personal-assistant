@@ -34,5 +34,6 @@ def test_send_raises_integration_error_on_client_error(sms_client_and_mock):
         {"Error": {"Code": "InvalidParameter", "Message": "Invalid phone number"}},
         "Publish",
     )
-    with pytest.raises(IntegrationError):
+    with pytest.raises(IntegrationError) as exc_info:
         client.send("+15551234567", "Hello world")
+    assert isinstance(exc_info.value.__cause__, ClientError)
